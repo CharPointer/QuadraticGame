@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kvadratinės Funkcijos Žaidimas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #1a1a1a;
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .game-container {
+            background: #2a2a2a;
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 900px;
+            width: 95%;
+            border: 1px solid #444;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 2em;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+        
+        .level {
+            font-size: 0.9em;
+            color: #888;
+        }
+        
+        .game-screen {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        canvas {
+            width: 100%;
+            height: 400px;
+            border-radius: 8px;
+            background: #111;
+            border: 1px solid #333;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+        
+        .control {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            min-width: 100px;
+        }
+        
+        .control.disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        .control-label {
+            font-size: 1.2em;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        
+        .control-value {
+            font-size: 1em;
+            margin-bottom: 10px;
+            color: #ccc;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: #555;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+        }
+        
+        .bottom-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .equation {
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            color: #ccc;
+        }
+        
+        .next-btn {
+            background: #555;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        
+        .next-btn:hover {
+            background: #666;
+        }
+        
+        .success-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 1.2em;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            text-align: center;
+        }
+        
+        .success-overlay.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <h1 id="gameTitle">Patrankos komandorius</h1>
+            <div class="level" id="levelText">1 lygis</div>
+        </div>
+        
+        <div class="game-screen">
+            <canvas id="gameCanvas" width="800" height="400"></canvas>
+            <div class="success-overlay" id="successOverlay">
+                Taikinys sunaikintas!
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="control" id="controlA">
+                <div class="control-label">a</div>
+                <div class="control-value" id="valueA">0.5</div>
+                <input type="range" id="sliderA" min="-3" max="3" step="0.1" value="0.5">
+            </div>
+            <div class="control disabled" id="controlB">
+                <div class="control-label">b</div>
+                <div class="control-value" id="valueB">0.0</div>
+                <input type="range" id="sliderB" min="-8" max="8" step="0.1" value="0">
+            </div>
+            <div class="control disabled" id="controlC">
+                <div class="control-label">c</div>
+                <div class="control-value" id="valueC">0.0</div>
+                <input type="range" id="sliderC" min="-10" max="10" step="0.1" value="0">
+            </div>
+        </div>
+        
+        <div class="bottom-bar">
+            <div class="equation" id="equationDisplay">y = 0.5x² + 0x + 0</div>
+            <button class="next-btn" onclick="nextLevel()">Kitas lygis</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let currentLevel = 1;
+        let currentTheme = 0;
+        let a = 0.5, b = 0, c = 0;
+        let targets = [];
+        let completedTargets = 0;
+        
+        const themes = [
+            {
+                name: "Patrankos komandorius",
+                drawBackground: drawCannonBackground,
+                drawTarget: drawCannon,
+                successText: "Taikinys sunaikintas!"
+            },
+            {
+                name: "Palydovo inžinierius",
+                drawBackground: drawSpaceBackground,
+                drawTarget: drawSatellite,
+                successText: "Palydovas nukreiptas!"
+            },
+            {
+                name: "Fontano dizaineris",
+                drawBackground: drawFountainBackground,
+                drawTarget: drawWater,
+                successText: "Tobulas vandens lankas!"
+            },
+            {
+                name: "Krepšinio treneris",
+                drawBackground: drawBasketballBackground,
+                drawTarget: drawBasket,
+                successText: "Tikslus metimas!"
+            }
+        ];
+        
+        const levels = [
+            { controls: ['a'], targetCount: 1 },
+            { controls: ['a'], targetCount: 2 },
+            { controls: ['a', 'c'], targetCount: 1 },
+            { controls: ['a', 'c'], targetCount: 2 },
+            { controls: ['a', 'b', 'c'], targetCount: 1 },
+            { controls: ['a', 'b', 'c'], targetCount: 3 }
+        ];
+        
+        function drawCannonBackground() {
+            // Draw ground
+            ctx.fillStyle = '#4a4a4a';
+            ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
+            
+            // Draw cannon
+            ctx.fillStyle = '#666';
+            ctx.fillRect(20, canvas.height - 80, 60, 40);
+            ctx.fillRect(70, canvas.height - 70, 40, 15);
+        }
+        
+        function drawCannon(x, y, hit) {
+            const px = x * 25 + canvas.width / 2;
+            const py = canvas.height / 2 - y * 25;
+            
+            if (hit) {
+                // Explosion effect
+                ctx.fillStyle = '#ff6b00';
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const dx = Math.cos(angle) * 15;
+                    const dy = Math.sin(angle) * 15;
+                    ctx.fillRect(px + dx, py + dy, 4, 4);
+                }
+            } else {
+                // Castle/fortress
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(px - 15, py - 20, 30, 25);
+                ctx.fillRect(px - 20, py - 15, 8, 15);
+                ctx.fillRect(px + 12, py - 15, 8, 15);
+                ctx.fillRect(px - 5, py - 25, 10, 8);
+            }
+        }
+        
+        function drawSpaceBackground() {
+            // Draw stars
+            ctx.fillStyle = '#fff';
+            for (let i = 0; i < 50; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                ctx.fillRect(x, y, 1, 1);
+            }
+            
+            // Draw Earth curve
+            ctx.strokeStyle = '#4a90e2';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, canvas.height + 200, 250, 0, Math.PI, true);
+            ctx.stroke();
+        }
+        
+        function drawSatellite(x, y, hit) {
+            const px = x * 25 + canvas.width / 2;
+            const py = canvas.height / 2 - y * 25;
+            
+            if (hit) {
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(px - 2, py - 2, 4, 4);
+                ctx.strokeStyle = '#00ff00';
+                ctx.beginPath();
+                ctx.arc(px, py, 15, 0, 2 * Math.PI);
+                ctx.stroke();
+            } else {
+                // Satellite
+                ctx.fillStyle = '#silver';
+                ctx.fillRect(px - 8, py - 4, 16, 8);
+                ctx.fillRect(px - 15, py - 1, 6, 2);
+                ctx.fillRect(px + 9, py - 1, 6, 2);
+                
+                // Target orbit
+                ctx.strokeStyle = '#666';
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.arc(px, py, 20, 0, 2 * Math.PI);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+        
+        function drawFountainBackground() {
+            // Draw fountain base
+            ctx.fillStyle = '#8B7D6B';
+            ctx.fillRect(canvas.width / 2 - 30, canvas.height - 60, 60, 30);
+            ctx.fillRect(canvas.width / 2 - 5, canvas.height - 80, 10, 20);
+        }
+        
+        function drawWater(x, y, hit) {
+            const px = x * 25 + canvas.width / 2;
+            const py = canvas.height / 2 - y * 25;
+            
+            if (hit) {
+                // Water splash
+                ctx.fillStyle = '#00bfff';
+                for (let i = 0; i < 6; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = Math.random() * 12;
+                    const dx = Math.cos(angle) * dist;
+                    const dy = Math.sin(angle) * dist;
+                    ctx.beginPath();
+                    ctx.arc(px + dx, py + dy, 2, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            } else {
+                // Water droplet target
+                ctx.fillStyle = '#00bfff';
+                ctx.beginPath();
+                ctx.arc(px, py, 8, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.fillStyle = '#87ceeb';
+                ctx.beginPath();
+                ctx.arc(px - 2, py - 2, 3, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+        
+        function drawBasketballBackground() {
+            // Draw court line
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height - 40);
+            ctx.lineTo(canvas.width, canvas.height - 40);
+            ctx.stroke();
+        }
+        
+        function drawBasket(x, y, hit) {
+            const px = x * 25 + canvas.width / 2;
+            const py = canvas.height / 2 - y * 25;
+            
+            if (hit) {
+                // Swish effect
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                for (let i = 0; i < 5; i++) {
+                    ctx.beginPath();
+                    ctx.arc(px, py, 5 + i * 3, 0.3, Math.PI - 0.3);
+                    ctx.stroke();
+                }
+            } else {
+                // Basketball hoop
+                ctx.strokeStyle = '#ff6600';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(px, py, 12, 0, Math.PI);
+                ctx.stroke();
+                
+                // Net
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                for (let i = -1; i <= 1; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(px + i * 8, py);
+                    ctx.lineTo(px + i * 4, py + 15);
+                    ctx.stroke();
+                }
+            }
+        }
+        
+        function initGame() {
+            generateTargets();
+            updateControls();
+            updateDisplay();
+            draw();
+        }
+        
+        function generateTargets() {
+            targets = [];
+            const level = levels[currentLevel - 1];
+            
+            for (let i = 0; i < level.targetCount; i++) {
+                targets.push({
+                    x: (Math.random() - 0.5) * 14 + (i - level.targetCount/2) * 4,
+                    y: Math.random() * 12 - 4,
+                    hit: false
+                });
+            }
+            completedTargets = 0;
+        }
+        
+        function updateControls() {
+            const level = levels[currentLevel - 1];
+            const controls = ['controlA', 'controlB', 'controlC'];
+            const allowed = ['a', 'b', 'c'];
+            
+            controls.forEach((controlId, index) => {
+                const control = document.getElementById(controlId);
+                if (level.controls.includes(allowed[index])) {
+                    control.classList.remove('disabled');
+                } else {
+                    control.classList.add('disabled');
+                }
+            });
+        }
+        
+        function updateDisplay() {
+            const theme = themes[currentTheme];
+            
+            document.getElementById('gameTitle').textContent = theme.name;
+            document.getElementById('levelText').textContent = `${currentLevel} lygis`;
+            document.getElementById('equationDisplay').textContent = `y = ${a}x² + ${b}x + ${c}`;
+        }
+        
+        function updateValues() {
+            a = parseFloat(document.getElementById('sliderA').value) || 0.5;
+            b = parseFloat(document.getElementById('sliderB').value) || 0;
+            c = parseFloat(document.getElementById('sliderC').value) || 0;
+            
+            document.getElementById('valueA').textContent = a;
+            document.getElementById('valueB').textContent = b;
+            document.getElementById('valueC').textContent = c;
+            
+            updateDisplay();
+            draw();
+            checkHits();
+        }
+        
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw theme background
+            themes[currentTheme].drawBackground();
+            
+            // Draw axes
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+            
+            // Draw parabola
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            let firstPoint = true;
+            for (let px = 0; px < canvas.width; px += 2) {
+                const x = (px - canvas.width / 2) / 25;
+                const y = a * x * x + b * x + c;
+                const py = canvas.height / 2 - y * 25;
+                
+                if (py >= -50 && py <= canvas.height + 50) {
+                    if (firstPoint) {
+                        ctx.moveTo(px, py);
+                        firstPoint = false;
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                }
+            }
+            ctx.stroke();
+            
+            // Draw targets with theme
+            targets.forEach(target => {
+                themes[currentTheme].drawTarget(target.x, target.y, target.hit);
+            });
+        }
+        
+        function checkHits() {
+            let newHits = false;
+            
+            targets.forEach(target => {
+                if (!target.hit) {
+                    const calculatedY = a * target.x * target.x + b * target.x + c;
+                    const distance = Math.abs(calculatedY - target.y);
+                    
+                    if (distance <= 0.8) {
+                        target.hit = true;
+                        completedTargets++;
+                        newHits = true;
+                    }
+                }
+            });
+            
+            if (newHits) {
+                showSuccess();
+                if (completedTargets === targets.length) {
+                    setTimeout(() => {
+                        if (currentLevel < levels.length) {
+                            currentLevel++;
+                            if (currentLevel > 2) {
+                                currentTheme = (currentTheme + 1) % themes.length;
+                            }
+                        }
+                        initGame();
+                    }, 1500);
+                }
+            }
+        }
+        
+        function showSuccess() {
+            const overlay = document.getElementById('successOverlay');
+            overlay.textContent = themes[currentTheme].successText;
+            overlay.classList.add('show');
+            setTimeout(() => {
+                overlay.classList.remove('show');
+            }, 1200);
+        }
+        
+        function nextLevel() {
+            if (currentLevel < levels.length) {
+                currentLevel++;
+                currentTheme = (currentTheme + 1) % themes.length;
+            } else {
+                currentLevel = 1;
+                currentTheme = 0;
+            }
+            initGame();
+        }
+        
+        // Event listeners
+        document.getElementById('sliderA').addEventListener('input', updateValues);
+        document.getElementById('sliderB').addEventListener('input', updateValues);
+        document.getElementById('sliderC').addEventListener('input', updateValues);
+        
+        // Initialize game
+        initGame();
+    </script>
+</body>
+</html>
